@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+    <body>
+        <h1>Instance of {{ class_name }}</h1>
+        <ul>
+            {% for attr, value in attributes.items %}
+            <li>{{ attr }}: {{ value }}</li>
+            {% endfor %}
+        </ul>
+        <a href="{% url 'update_instance' %}">Edit</a>
+    </body>
+</html>
