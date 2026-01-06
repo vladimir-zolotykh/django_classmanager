@@ -1,4 +1,6 @@
 # core/utils.py
+
+
 def create_class_instance(class_name, fields):
     """
     Dynamically create a simple class and return an instance.
