@@ -1,0 +1,18 @@
+# core/forms.py
+from django import forms
+
+
+class ClassDefinitionForm(forms.Form):
+    class_name = forms.CharField(label="Class Name")
+    attributes = forms.CharField(label="Attributes (comma separated, e.g. name, age)")
+
+
+class UpdateForm(forms.Form):
+    def __init__(self, *args, instance=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if instance is None:
+            return
+
+        for key, value in instance.items():
+            self.fields[key] = forms.CharField(initial=value, required=False)
