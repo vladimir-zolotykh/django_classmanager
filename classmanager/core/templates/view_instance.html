@@ -7,6 +7,6 @@
             <li>{{ attr }}: {{ value }}</li>
             {% endfor %}
         </ul>
-        <a href="{% url 'update_instance' %}">Edit</a>
+        <a href="{% url 'update_instance' pk=instance.id %}">Edit</a>
     </body>
 </html>

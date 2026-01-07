@@ -1,6 +1,6 @@
-# core/views.py
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from .forms import ClassDefinitionForm, UpdateForm
+from .models import DynamicClass, DynamicInstance
 
 
 def define_class(request):
@@ -8,44 +8,48 @@ def define_class(request):
         form = ClassDefinitionForm(request.POST)
         if form.is_valid():
             class_name = form.cleaned_data["class_name"]
-            attrs = [a.strip() for a in form.cleaned_data["attributes"].split(",")]
-            fields = {a: "" for a in attrs}
-            request.session["class_name"] = class_name
-            request.session["attributes"] = fields
-            return redirect("update_instance")
+            attrs = [
+                a.strip()
+                for a in form.cleaned_data["attributes"].split(",")
+                if a.strip()
+            ]
+            dyn_class = DynamicClass.objects.create(name=class_name, attributes=attrs)
+            # create empty instance
+            instance = DynamicInstance.objects.create(
+                dynamic_class=dyn_class, values={a: "" for a in attrs}
+            )
+            return redirect("update_instance", pk=instance.pk)
     else:
         form = ClassDefinitionForm()
     return render(request, "define_class.html", {"form": form})
 
 
-def update_instance(request):
-    class_name = request.session.get("class_name")
-    attributes = request.session.get("attributes")
-    if not class_name or not attributes:
-        return redirect("define_class")
-
+def update_instance(request, pk):
+    instance = get_object_or_404(DynamicInstance, pk=pk)
     if request.method == "POST":
-        form = UpdateForm(request.POST, instance=attributes)
+        form = UpdateForm(request.POST, instance=instance)
         if form.is_valid():
             for attr, value in form.cleaned_data.items():
-                attributes[attr] = value
-            request.session["attributes"] = attributes
-            return redirect("view_instance")
+                instance.values[attr] = value
+            instance.save()
+            return redirect("view_instance", pk=instance.pk)
     else:
-        form = UpdateForm(instance=attributes)
-
+        form = UpdateForm(instance=instance)
     return render(
-        request, "update_instance.html", {"form": form, "class_name": class_name}
+        request,
+        "update_instance.html",
+        {"form": form, "class_name": instance.dynamic_class.name},
     )
 
 
-def view_instance(request):
-    class_name = request.session.get("class_name")
-    attributes = request.session.get("attributes")
-    if not class_name or not attributes:
-        return redirect("define_class")
+def view_instance(request, pk):
+    instance = get_object_or_404(DynamicInstance, pk=pk)
     return render(
         request,
         "view_instance.html",
-        {"class_name": class_name, "attributes": attributes},
+        {
+            "class_name": instance.dynamic_class.name,
+            "attributes": instance.values,
+            "instance": instance,
+        },
     )
