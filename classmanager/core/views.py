@@ -1,8 +1,38 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from .forms import ClassDefinitionForm, UpdateForm
-from .models import DynamicClass, DynamicInstance
+from .forms import ClassDefinitionForm, UpdateForm, LoginForm
+from .models import DynamicClass, DynamicInstance, AppUser
 
 
+# --- Authorization helper ---
+def require_login(view_func):
+    def wrapper(request, *args, **kwargs):
+        if not request.session.get("user_id"):
+            return redirect("login")
+        return view_func(request, *args, **kwargs)
+
+    return wrapper
+
+
+def login_view(request):
+    if request.method == "POST":
+        form = LoginForm(request.POST)
+        if form.is_valid():
+            try:
+                user = AppUser.objects.get(
+                    username=form.cleaned_data["username"],
+                    password=form.cleaned_data["password"],
+                )
+                request.session["user_id"] = user.id
+                return redirect("define_class")
+            except AppUser.DoesNotExist:
+                form.add_error(None, "Invalid username or password")
+    else:
+        form = LoginForm()
+    return render(request, "login.html", {"form": form})
+
+
+# --- Protected views ---
+@require_login
 def define_class(request):
     if request.method == "POST":
         form = ClassDefinitionForm(request.POST)
@@ -14,7 +44,6 @@ def define_class(request):
                 if a.strip()
             ]
             dyn_class = DynamicClass.objects.create(name=class_name, attributes=attrs)
-            # create empty instance
             instance = DynamicInstance.objects.create(
                 dynamic_class=dyn_class, values={a: "" for a in attrs}
             )
@@ -24,6 +53,7 @@ def define_class(request):
     return render(request, "define_class.html", {"form": form})
 
 
+@require_login
 def update_instance(request, pk):
     instance = get_object_or_404(DynamicInstance, pk=pk)
     if request.method == "POST":
@@ -42,6 +72,7 @@ def update_instance(request, pk):
     )
 
 
+@require_login
 def view_instance(request, pk):
     instance = get_object_or_404(DynamicInstance, pk=pk)
     return render(

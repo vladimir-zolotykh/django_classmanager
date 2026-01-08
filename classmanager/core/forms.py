@@ -13,3 +13,8 @@ class UpdateForm(forms.Form):
             return
         for key, value in instance.values.items():
             self.fields[key] = forms.CharField(initial=value, required=False)
+
+
+class LoginForm(forms.Form):
+    username = forms.CharField()
+    password = forms.CharField(widget=forms.PasswordInput)
