@@ -1,4 +1,6 @@
+import base64
 from django.shortcuts import render, redirect, get_object_or_404
+from django.http import HttpResponse
 from .forms import ClassDefinitionForm, UpdateForm, LoginForm
 from .models import DynamicClass, DynamicInstance, AppUser
 
@@ -6,24 +8,45 @@ from .models import DynamicClass, DynamicInstance, AppUser
 # --- Authorization helper ---
 def require_login(view_func):
     def wrapper(request, *args, **kwargs):
-        if not request.session.get("user_id"):
-            return redirect("login")
+        auth_header = request.META.get("HTTP_AUTHORIZATION")
+        if not auth_header or not auth_header.startswith("Basic "):
+            # Ask for credentials
+            response = HttpResponse("Authorization required", status=401)
+            response["WWW-Authenticate"] = 'Basic realm="classmanager"'
+            return response
+
+        # Decode Basic Auth header
+        try:
+            encoded = auth_header.split(" ")[1]
+            decoded = base64.b64decode(encoded).decode("utf-8")
+            username, password = decoded.split(":", 1)
+        except Exception:
+            return HttpResponse("Invalid authorization header", status=400)
+
+        # Check against DB
+        try:
+            user = AppUser.objects.get(username=username, password=password)
+            request.user = user  # attach user to request
+        except AppUser.DoesNotExist:
+            return HttpResponse("Invalid credentials", status=401)
+
         return view_func(request, *args, **kwargs)
 
     return wrapper
 
 
+# --- Optional login view (form-based) ---
 def login_view(request):
     if request.method == "POST":
         form = LoginForm(request.POST)
         if form.is_valid():
+            username = form.cleaned_data["username"]
+            password = form.cleaned_data["password"]
             try:
-                user = AppUser.objects.get(
-                    username=form.cleaned_data["username"],
-                    password=form.cleaned_data["password"],
-                )
-                request.session["user_id"] = user.id
-                return redirect("define_class")
+                AppUser.objects.get(username=username, password=password)
+                # Normally you'd set a session, but with Basic Auth
+                # you just instruct the user to send Authorization header.
+                return HttpResponse("Login successful. Please use Basic Auth headers.")
             except AppUser.DoesNotExist:
                 form.add_error(None, "Invalid username or password")
     else:
